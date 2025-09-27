@@ -1,5 +1,5 @@
-//#include "../unpv13e-master/lib/unp.h" // change according to directory
-#include "../lib/unp.h"
+#include "../unpv13e-master/lib/unp.h" // change according to directory
+//#include "../lib/unp.h"
 #include <stdio.h> // support I/O
 #include <stdlib.h> // for atoi
 #include <sys/wait.h> // for waitpid 
@@ -44,16 +44,11 @@ static int last_sock = -1;
 static int elapsed = 0;
 
 
-typedef struct {
-	pid_t pid;
-	int port;
-} child_info;
-
-
+typedef struct { pid_t pid; int port; } child_info;
 child_info children[MAX_CHILDREN];
 int num_children = 0;
 
-void sigalrm_handler(int signo) {
+void sigalrm_handler(int signo) { // use SIGALRM to handle timeouts and retransmissions
     if (elapsed >= ABORT) {
         perror("ERROR: Elapsed time greater than 10 seconds. Aborting transfer\n");
         exit(EXIT_FAILURE);
@@ -70,7 +65,10 @@ void setup_signal_handlers() {
     sa.sa_handler = sigalrm_handler;
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = 0;
-    sigaction(SIGALRM, &sa, NULL);
+    if (sigaction(SIGALRM, &sa, NULL) < 0) {
+    	perror("ERROR: sigaction() failed");
+    	exit(EXIT_FAILURE);
+    }
 }
 
 int send_error(int sock, const struct sockaddr *client_addr, socklen_t addr_len, int error_code, const char *error_msg)
@@ -99,7 +97,7 @@ int send_error(int sock, const struct sockaddr *client_addr, socklen_t addr_len,
     return 0;
 }
 
-void handle_rrq(FILE *fp, int sock, struct sockaddr_in *client_addr, socklen_t client_len) {
+void handle_rrq(FILE *fp, int sock, struct sockaddr_in *client_addr, socklen_t client_len) { // send data and wait for ACKs
     unsigned short block = 1;
     size_t nread;
     unsigned char buf[MAXBUF];
@@ -108,7 +106,7 @@ void handle_rrq(FILE *fp, int sock, struct sockaddr_in *client_addr, socklen_t c
     last_client_addr = *client_addr;
     last_client_len = client_len;
 
-    while (1) {
+    while (1) { // loop through file
         // read up to 512 bytes
         nread = fread(buf + 4, 1, DATA_SIZE, fp);
 
@@ -162,7 +160,7 @@ void handle_rrq(FILE *fp, int sock, struct sockaddr_in *client_addr, socklen_t c
     }
 }
 
-void handle_wrq(FILE *fp, int sock, struct sockaddr_in *client_addr, socklen_t client_len) {
+void handle_wrq(FILE *fp, int sock, struct sockaddr_in *client_addr, socklen_t client_len) { // handle incoming data packets
     unsigned short block = 0; // start with ACK block 0
     unsigned char ack_buf[MAXBUF];
 
